@@ -1,1 +1,101 @@
 
+name: CI/CD Deploy to Somee
+
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: somee-deployment
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    env:
+      PROJECT: ComputerRepairManagement/ComputerRepairManagement.csproj
+
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore packages
+        run: dotnet restore "$PROJECT"
+
+      - name: Build project
+        run: dotnet build "$PROJECT" -c Release --no-restore
+
+      - name: Publish project
+        run: |
+          dotnet publish "$PROJECT" \
+            -c Release \
+            --no-restore \
+            --no-self-contained \
+            -p:UseAppHost=false \
+            -o ./publish
+
+      - name: Configure production database
+        env:
+          DB_CONNECTION_STRING: ${{ secrets.DB_CONNECTION_STRING }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          connection = os.environ["DB_CONNECTION_STRING"]
+          if not connection:
+              raise ValueError("Missing database connection secret")
+
+          path = Path("publish/appsettings.Production.json")
+          config = json.loads(path.read_text()) if path.exists() else {}
+          config.setdefault("ConnectionStrings", {})
+          config["ConnectionStrings"]["DefaultConnection"] = connection
+          path.write_text(json.dumps(config, indent=2))
+          PY
+
+      - name: Install FTP client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y lftp
+
+      - name: Deploy to Somee
+        env:
+          FTP_SERVER: ${{ secrets.FTP_SERVER }}
+          FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+          LFTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+          FTP_DIRECTORY: ${{ secrets.FTP_DIRECTORY }}
+        run: |
+          test -n "$FTP_SERVER"
+          test -n "$FTP_USERNAME"
+          test -n "$LFTP_PASSWORD"
+          test -n "$FTP_DIRECTORY"
+
+          echo "Website is being updated..." > app_offline.htm
+
+          lftp --env-password -u "$FTP_USERNAME" "ftp://$FTP_SERVER" <<EOF
+          set cmd:fail-exit yes
+          set ftp:passive-mode yes
+          set ftp:ssl-force yes
+          set ftp:ssl-protect-data yes
+          set ssl:verify-certificate yes
+          set net:max-retries 2
+          set net:timeout 30
+          cd "$FTP_DIRECTORY"
+          put app_offline.htm
+          sleep 15
+          mirror -R --transfer-all --overwrite --no-perms ./publish/ .
+          rm app_offline.htm
+          bye
+          EOF
