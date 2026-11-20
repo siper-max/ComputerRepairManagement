@@ -1,0 +1,97 @@
+﻿@model IEnumerable<ComputerRepairManagement.Models.Database.KhachHang>
+
+@{
+    ViewData["Title"] = "Quản lý khách hàng";
+}
+
+<h2>Quản lý khách hàng</h2>
+
+<hr />
+
+<h4>Thêm khách hàng mới</h4>
+
+@if (TempData["Error"] != null)
+{
+    <div class="alert alert-danger">
+        @TempData["Error"]
+    </div>
+}
+
+<form asp-controller="KhachHangs"
+      asp-action="Save" method="post">
+
+    <input type="hidden" name="id" value="0" />
+
+    <div class="mb-3">
+        <label>Họ và tên</label>
+        <input name="hoTen" class="form-control"
+               maxlength="100" required />
+    </div>
+
+    <div class="mb-3">
+        <label>Số điện thoại</label>
+        <input name="soDienThoai" class="form-control"
+               maxlength="20" required />
+    </div>
+
+    <button type="submit" class="btn btn-primary">
+        Thêm khách hàng
+    </button>
+</form>
+
+<hr />
+
+<h4>Danh sách khách hàng</h4>
+
+@if (!Model.Any())
+{
+    <p>Chưa có khách hàng.</p>
+}
+
+@foreach (var item in Model)
+{
+    <div class="card mb-3">
+        <div class="card-body">
+
+            <p>Mã khách hàng: @item.Id</p>
+
+            <form asp-controller="KhachHangs"
+                  asp-action="Save" method="post">
+
+                <input type="hidden" name="id"
+                       value="@item.Id" />
+
+                <div class="mb-2">
+                    <label>Họ và tên</label>
+                    <input name="hoTen"
+                           value="@item.HoTen"
+                           class="form-control"
+                           maxlength="100" required />
+                </div>
+
+                <div class="mb-2">
+                    <label>Số điện thoại</label>
+                    <input name="soDienThoai"
+                           value="@item.SoDienThoai"
+                           class="form-control"
+                           maxlength="20" required />
+                </div>
+
+                <button type="submit"
+                        class="btn btn-warning">
+                    Lưu chỉnh sửa
+                </button>
+
+                <button type="submit"
+                        asp-controller="KhachHangs"
+                        asp-action="Delete"
+                        class="btn btn-danger"
+                        formnovalidate
+                        onclick="return confirm('Bạn có chắc muốn xóa?')">
+                    Xóa
+                </button>
+
+            </form>
+        </div>
+    </div>
+}
