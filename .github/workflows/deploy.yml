@@ -87,15 +87,13 @@ jobs:
           lftp --env-password -u "$FTP_USERNAME" "ftp://$FTP_SERVER" <<EOF
           set cmd:fail-exit yes
           set ftp:passive-mode yes
-          set ftp:ssl-force yes
-          set ftp:ssl-protect-data yes
-          set ssl:verify-certificate yes
+          set ftp:ssl-allow no
           set net:max-retries 2
           set net:timeout 30
           cd "$FTP_DIRECTORY"
           put app_offline.htm
           sleep 15
-          mirror -R --transfer-all --overwrite --no-perms ./publish/ .
+          mirror -R --transfer-all --overwrite --no-perms --exclude-glob appsettings.Production.json ./publish/ .
           rm app_offline.htm
           bye
           EOF
